@@ -2,7 +2,12 @@
 
 This project uses pybind11 to wrap Ceres with a python interface.
 
-**TODO change note with url**
+**This fork** contains:
+
+- Fixes for including LocalParameterization objects.
+- Custom AutoDiff cost function for Eigen Quaternion difference residuals.
+
+The code is meant to accompany my notes on the Ceres Solver [here](https://notes.andrewtorgesen.com/doku.php?id=public:ceres).
 
 ## Build Setup
 There are two different ways to build this library. The easiest and recommended
