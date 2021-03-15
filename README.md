@@ -2,6 +2,8 @@
 
 This project uses pybind11 to wrap Ceres with a python interface.
 
+**TODO change note with url**
+
 ## Build Setup
 There are two different ways to build this library. The easiest and recommended
 way is to build it along with the Ceres library. The other way builds it 
