@@ -184,11 +184,11 @@ class PyLocalParameterization : public ceres::LocalParameterization {
 
   bool Plus(const double *x,
             const double *delta,
-            double *x_plus_delta) const {
+            double *x_plus_delta) const override {
     assert(false);
     return true;
   }
-  bool ComputeJacobian(const double *x, double *jacobian) const {
+  bool ComputeJacobian(const double *x, double *jacobian) const override {
     assert(false);
     return true;
   }
@@ -196,7 +196,7 @@ class PyLocalParameterization : public ceres::LocalParameterization {
   bool MultiplyByJacobian(const double *x,
                           const int num_rows,
                           const double *global_matrix,
-                          double *local_matrix) const {
+                          double *local_matrix) const override {
     assert(false);
     return true;
   }
@@ -768,8 +768,19 @@ PYBIND11_MODULE(PyCeres, m) {
                  ceres::LocalParameterization *local_parameterization) {
                 double *pointer = ParseNumpyData(values);
                 myself.AddParameterBlock(pointer, size, local_parameterization);
-              }
+              },
+              py::keep_alive<1, 4>() // LocalParameterization
   );
+  // ^^^ The keep_alive() call above took about an hour of tedious debugging to figure out. Even after
+  //     properly wrapping (I think) the local parameterization inheriter classes, the program was
+  //     segfaulting. Using gdb+python and a lot of print statements from within Ceres' internal code,
+  //     I realized that at least some of the memory associated with the local-parameterization-specific
+  //     fields within the parameter_block object were being overriden or even deleted between the time that
+  //     they are added and the time that they are used in solve(). I then noticed in the README for the 
+  //     python wrappers that Python doesn't understand personal space when it comes to memory, so it will
+  //     sometimes delete memory that C++ says belongs to somebody else. The keep_alive() method ensures that
+  //     Python will not touch the local parameterization's memory until it is allowed to delete the problem 
+  //     itself.
 
   problem.def("RemoveParameterBlock",
               [](ceres::Problem &myself,
@@ -891,19 +902,34 @@ PYBIND11_MODULE(PyCeres, m) {
              }
            });
 
-  py::class_<ceres::TrivialLoss>(m, "TrivialLoss")
-      .def(py::init<>());
+  // py::class_<ceres::TrivialLoss>(m, "TrivialLoss")
+  //     .def(py::init<>());
 
-  py::class_<ceres::HuberLoss>(m, "HuberLoss")
-      .def(py::init<double>());
-  py::class_<ceres::SoftLOneLoss>(m, "SoftLOneLoss")
-      .def(py::init<double>());
+  // py::class_<ceres::HuberLoss>(m, "HuberLoss")
+  //     .def(py::init<double>());
+  // py::class_<ceres::SoftLOneLoss>(m, "SoftLOneLoss")
+  //     .def(py::init<double>());
 
-  py::class_<ceres::CauchyLoss>(m, "CauchyLoss")
-      .def(py::init<double>());
+  // py::class_<ceres::CauchyLoss>(m, "CauchyLoss")
+  //     .def(py::init<double>());
+
+  // py::class_<ceres::LossFunction, PyLossFunction>(m, "LossFunction")
+  //     .def(py::init<>());
 
   py::class_<ceres::LossFunction, PyLossFunction>(m, "LossFunction")
       .def(py::init<>());
+
+  py::class_<ceres::TrivialLoss, ceres::LossFunction>(m, "TrivialLoss")
+      .def(py::init<>());
+
+  py::class_<ceres::HuberLoss, ceres::LossFunction>(m, "HuberLoss")
+      .def(py::init<double>());
+
+  py::class_<ceres::SoftLOneLoss, ceres::LossFunction>(m, "SoftLOneLoss")
+      .def(py::init<double>());
+
+  py::class_<ceres::CauchyLoss, ceres::LossFunction>(m, "CauchyLoss")
+      .def(py::init<double>());
 
   py::class_<ceres::Solver::Summary> solver_summary(m, "Summary");
   using s_summary=ceres::Solver::Summary;
@@ -1075,24 +1101,19 @@ PYBIND11_MODULE(PyCeres, m) {
                                                         "FirstOrderFunction")
       .def(py::init<>());
 
-  py::class_<ceres::LocalParameterization,
-             PyLocalParameterization /* <--- trampoline*/>(m,
-                                                           "LocalParameterization")
+  py::class_<ceres::LocalParameterization, PyLocalParameterization  /* <--- trampoline*/>(m, "LocalParameterization")
       .def(py::init<>())
       .def("GlobalSize", &ceres::LocalParameterization::GlobalSize)
       .def("LocalSize", &ceres::LocalParameterization::LocalSize);
-
-  py::class_<ceres::IdentityParameterization>(m, "IdentityParameterization")
+  py::class_<ceres::IdentityParameterization, ceres::LocalParameterization>(m, "IdentityParameterization")
       .def(py::init<int>());
-  py::class_<ceres::QuaternionParameterization>(m, "QuaternionParameterization")
+  py::class_<ceres::QuaternionParameterization, ceres::LocalParameterization>(m, "QuaternionParameterization")
       .def(py::init<>());
-  py::class_<ceres::HomogeneousVectorParameterization>(m,
-                                                       "HomogeneousVectorParameterization")
+  py::class_<ceres::HomogeneousVectorParameterization, ceres::LocalParameterization>(m, "HomogeneousVectorParameterization")
       .def(py::init<int>());
-  py::class_<ceres::EigenQuaternionParameterization>(m,
-                                                     "EigenQuaternionParameterization")
+  py::class_<ceres::EigenQuaternionParameterization, ceres::LocalParameterization>(m, "EigenQuaternionParameterization")
       .def(py::init<>());
-  py::class_<ceres::SubsetParameterization>(m, "SubsetParameterization")
+  py::class_<ceres::SubsetParameterization, ceres::LocalParameterization>(m, "SubsetParameterization")
       .def(py::init<int, const std::vector<int> &>());
 
   py::class_<ceres::GradientProblem> grad_problem(m, "GradientProblem");
