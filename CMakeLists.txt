@@ -24,6 +24,7 @@ include_directories(${CERES_FOLDER}/config)
 
 add_definitions(-DCERES_NO_THREADS)
 
+find_package(Sophus 1.0)
 
 list(APPEND PYTORCH_FILES "")
 if(${WITH_PYTORCH})
@@ -54,7 +55,7 @@ if (EIGEN3_FOUND)
     include_directories(${EIGEN3_INCLUDE_DIR})
 endif()
 
-target_link_libraries(PyCeres PRIVATE ${CERES_FOLDER}/build/lib/libceres.a ${CERES_FOLDER}/glog/build/libglog.a -llapack -lcxsparse)
+target_link_libraries(PyCeres PRIVATE Sophus::Sophus ${CERES_FOLDER}/build/lib/libceres.a ${CERES_FOLDER}/glog/build/libglog.a -llapack -lcxsparse)
 
 if(${WITH_PYTORCH})
     target_link_libraries(PyCeres PRIVATE "${TORCH_LIBRARIES}")
