@@ -72,7 +72,7 @@ EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
     // compute residual via boxminus (i.e., the logarithmic map of the error pose)
     // weight with inverse covariance
-    r = Qij_inv_.cast<T>() * (Xij_inv_.cast<T>() * Xij_hat).log();        
+    r = Qij_inv_.cast<T>() * (Xij_inv_.cast<T>() * Xij_hat).log();  
 
     return true;
   }
@@ -128,6 +128,45 @@ EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 private:
   double rij_;
   double qij_inv_;
+};
+
+// AutoDiff cost function (factor) for the difference between an altitude 
+// measurement hi, and the altitude of an estimated pose, Xi_hat. 
+// Weighted by measurement variance, qij_.
+class AltFunctor
+{
+public:
+EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  // store measured range and inverted variance
+  AltFunctor(double &hi, double &qi)
+  {
+    hi_ = hi;
+    qi_inv_ = 1.0 / qi;
+  }
+
+  // templated residual definition for both doubles and jets
+  template<typename T>
+  bool operator()(const T* _Xi_hat, T* _res) const
+  {
+    // assign memory to usable objects
+    T hi_hat = *(_Xi_hat + 2);
+
+    // altitude measurement error, scaled by inverse variance
+    *_res = static_cast<T>(qi_inv_) * (static_cast<T>(hi_) - hi_hat);
+
+    return true;
+  }
+
+  // cost function generator--ONLY FOR PYTHON WRAPPER
+  static ceres::CostFunction *Create(double &hi, double &qi) {
+    return new ceres::AutoDiffCostFunction<AltFunctor,
+                                           1,
+                                           7>(new AltFunctor(hi, qi));
+  }
+
+private:
+  double hi_;
+  double qi_inv_;
 };
 
 // AutoDiff cost function (factor) for the difference between a measured 3D
@@ -351,6 +390,9 @@ void add_custom_cost_functions(py::module &m) {
 
   // RangeFactor
   m.def("RangeFactor", &RangeFunctor::Create);
+
+  // AltFactor
+  m.def("AltFactor", &AltFunctor::Create);
 
   // Transform3DFactor
   m.def("Transform3DFactor", &Transform3DFunctor::Create);
